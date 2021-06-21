@@ -6,7 +6,63 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <libssh2.h>
+
+static int hostSockAccepted, sshSockAccepted;
+
+static void shell()
+{
+        char input[1024];
+        while (1)
+        {
+                ssize_t szinput = recv(sshSockAccepted, input, sizeof(input), 0);
+                if (szinput == -1)
+		{
+			fprintf(stderr, "Error in recv(sshSockAccepted) at %s:%d\n", __FILE__, __LINE__);
+			exit(-1);
+		}
+
+		printf("Transferring %zu bytes from SSH client to host\n", (size_t)szinput);
+
+                while (szinput)
+                {
+                        ssize_t sent = send(hostSockAccepted, input, szinput, 0);
+                        if (sent == -1)
+			{
+				fprintf(stderr, "Error in send(hostSockAccepted) at %s:%d\n", __FILE__, __LINE__);
+				exit(-1);
+			}
+
+                        szinput -= sent;
+
+                        char output[1024];
+                        while (1)
+                        {
+                                ssize_t szoutput = recv(hostSockAccepted, output, sizeof(output), 0);
+                                if (szoutput == -1)
+				{
+					fprintf(stderr, "Error in recv(hostSockAccepted) at %s:%d\n", __FILE__, __LINE__);
+					exit(-1);
+				}
+
+                                if (szoutput == 0) break;
+
+				printf("Transferring %zu bytes from host to SSH client\n", (size_t)szoutput);
+
+                                while (szoutput)
+                                {
+                                        ssize_t received = send(sshSockAccepted, output, szoutput, 0);
+                                        if (received == -1)
+					{
+						fprintf(stderr, "Error in send(sshSockAccepted) at %s:%d\n", __FILE__, __LINE__);
+						exit(-1);
+					}
+
+                                        szoutput -= received;
+                                }
+                        }
+                }
+        }
+}
 
 int main(int argc, char const *argv[])
 {
@@ -16,49 +72,63 @@ int main(int argc, char const *argv[])
 		return 0;
 	}
 
-	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
+	int hostSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	int optval;
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+	if (setsockopt(hostSock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
 	{
-		fprintf(stderr, "Error setting TCP socket options\n");
+		fprintf(stderr, "Error setting host socket options\n");
 		exit(-1);
 	}
 
-	struct sockaddr_in server_address;
-	server_address.sin_family = AF_INET;
-	server_address.sin_addr.s_addr = inet_addr("0.0.0.0");
-	server_address.sin_port = htons(atoi(argv[1]));
-	bind(sock, (struct sockaddr *)&server_address, sizeof(server_address));
-	listen(sock, 5);
-	struct sockaddr_in client_address;
-	socklen_t client_length = sizeof(client_address);
-	int client_socket = accept(sock, (struct sockaddr *)&client_address, &client_length);
-	if (client_socket == -1)
+	struct sockaddr_in hostSockAddress;
+	hostSockAddress.sin_family = AF_INET;
+	hostSockAddress.sin_addr.s_addr = inet_addr("0.0.0.0");
+	hostSockAddress.sin_port = htons(atoi(argv[1]));
+	bind(hostSock, (struct sockaddr *)&hostSockAddress, sizeof(hostSockAddress));
+	listen(hostSock, 1);
+	socklen_t hostSockAddressLength = sizeof(hostSockAddress);
+	hostSockAccepted = accept(hostSock, (struct sockaddr *)&hostSockAddress, &hostSockAddressLength);
+	if (hostSockAccepted == -1)
 	{
-		fprintf(stderr, "Error accepting socket connection\n");
+		fprintf(stderr, "Error accepting host connection\n");
 		exit(-1);
 	}
 
-	// Create a session instance.
-	LIBSSH2_SESSION* session = libssh2_session_init();
-	if (!session)
-	{
-		fprintf(stderr, "Could not initialize SSH session!\n");
-		exit(-1);
-	}
+	printf("Connected to host %s:%d\n", "a", 1);
 
-	// Start session. This will trade welcome banners, exchange keys,
-	// and setup crypto, compression, and MAC layers
-	int rc = libssh2_session_handshake(session, client_socket);
-	if (rc)
-	{
-		fprintf(stderr, "Error when starting up SSH session: %d\n", rc);
-		exit(-1);
-	}
+        int sshSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (setsockopt(sshSock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+        {
+                fprintf(stderr, "Error setting host socket options\n");
+                exit(-1);
+        }
 
-	printf("Success!\n");
+        struct sockaddr_in sshSockAddress;
+        sshSockAddress.sin_family = AF_INET;
+        sshSockAddress.sin_addr.s_addr = inet_addr("0.0.0.0");
+        sshSockAddress.sin_port = htons(atoi(argv[1]) + 1);
+        bind(sshSock, (struct sockaddr *)&sshSockAddress, sizeof(sshSockAddress));
+        listen(sshSock, 1);
+        socklen_t sshSockAddressLength = sizeof(sshSockAddress);
+        sshSockAccepted = accept(sshSock, (struct sockaddr *)&sshSockAddress, &sshSockAddressLength);
+        if (sshSockAccepted == -1)
+        {
+                fprintf(stderr, "Error accepting host connection\n");
+                exit(-1);
+        }
 
-	return 0;
+        printf("Connected to SSH client %s:%d\n", "a", 1);
+
+        shell();
+
+#ifdef _WIN32
+        closesocket(hostSock); closesocket(hostSockAccepted);
+        closesocket(sshSock); closesocket(sshSockAccepted);
+        WSACleanup();
+#else
+        close(hostSock); close(hostSockAccepted);
+        close(sshSock); close(sshSockAccepted);
+#endif
+        return 0;
 }
 

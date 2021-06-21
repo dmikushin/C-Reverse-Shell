@@ -7,4 +7,4 @@ $(APP): reverse.c
 
 
 clean:
-	rm server $(APP)
+	rm -rf $(APP)

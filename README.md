@@ -1,6 +1,6 @@
-# C ++ Reverse Shell
+# SRES: SSH via a Reversed Socket connection
 
-Connect Windows host to a remote machine and run Windows shell commands remotely over TCP.
+Reach a NAT/Firewalled machine from the Internet by initiating a socket connection to another machine in the Internet, and tunneling SSH session back through sockets. The idea is the same as in the well-known [Reverse-Shell](https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md) tricks, but tailored to the SSH connection.
 
 ## Building
 
@@ -17,17 +17,16 @@ make
 
 ## Testing
 
-On the Windows machine:
+On the NAT/Firewalled machine:
 
 ```
-./c-reverse-shell.exe 192.168.1.3 4444
+./sres-host 192.168.1.3 4444
 ```
 
-On the remote machine:
+On the Internet machine:
 
 ```
-netcat -lvnp 4444
+./sres-remote 4444
+ssh localhost -p 4445
 ```
-
-Start typing commands on the remote machine, right after receiving "Connection from..." message.
 

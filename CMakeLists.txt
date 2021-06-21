@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(ssh-tcpip)
+project(sres)
 
 add_executable(${PROJECT_NAME}-host "src/host.c")
 target_include_directories(${PROJECT_NAME}-host PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

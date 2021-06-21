@@ -4,11 +4,11 @@ Reach a NAT/Firewalled machine from the Internet by initiating a socket connecti
 
 ## Building
 
-Prerequisite: MinGW or MSYS2 compiler toolchain.
+Prerequisite on Windows: MinGW or MSYS2 compiler toolchain.
 
 ```
-git clone https://github.com/dev-frog/C-Reverse-Shell.git
-cd C-Reverse-Shell
+git clone https://github.com/dmikushin/sres.git
+cd sres
 mkdir build
 cd build
 cmake ..

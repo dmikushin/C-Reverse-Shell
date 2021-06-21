@@ -8,6 +8,8 @@ target_link_library(${PROJECT_NAME}-host wsock32 wininet)
 endif()
 
 if (UNIX)
+add_subdirectory(ThirdParty/libssh2 EXCLUDE_FROM_ALL)
 add_executable(${PROJECT_NAME}-remote "src/remote.c")
+target_link_libraries(${PROJECT_NAME}-remote libssh2)
 endif()
 

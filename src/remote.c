@@ -6,11 +6,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <libssh2.h>
 
 int main(int argc, char const *argv[])
 {
 	if (argc != 2)
-	{   
+	{
 		printf("Usage: %s <port>\n", argv[0]);
 		return 0;
 	}
@@ -39,23 +40,24 @@ int main(int argc, char const *argv[])
 		exit(-1);
 	}
 
-	char buffer[1024];
-	char response[18384];
-	while (1)
+	// Create a session instance.
+	LIBSSH2_SESSION* session = libssh2_session_init();
+	if (!session)
 	{
-		memset(&buffer, 0, sizeof(buffer));
-		memset(&response, 0, sizeof(response));
-		printf("Shell >> ");
-		fgets(buffer, sizeof(buffer), stdin);
-		strtok(buffer, "\n");
-		write(client_socket, buffer, sizeof(buffer));
-
-		if (strncmp("q", buffer, 1) == 0)
-			break;
-		
-		recv(client_socket, response, sizeof(response), MSG_WAITALL);
-		printf("%s", response);
+		fprintf(stderr, "Could not initialize SSH session!\n");
+		exit(-1);
 	}
+
+	// Start session. This will trade welcome banners, exchange keys,
+	// and setup crypto, compression, and MAC layers
+	int rc = libssh2_session_handshake(session, client_socket);
+	if (rc)
+	{
+		fprintf(stderr, "Error when starting up SSH session: %d\n", rc);
+		exit(-1);
+	}
+
+	printf("Success!\n");
 
 	return 0;
 }

@@ -5,7 +5,7 @@ project(sres)
 add_executable(${PROJECT_NAME}-host "src/host.c")
 target_include_directories(${PROJECT_NAME}-host PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 if (MINGW)
-target_link_library(${PROJECT_NAME}-host wsock32 wininet)
+target_link_libraries(${PROJECT_NAME}-host wsock32 wininet)
 endif()
 
 if (UNIX)

@@ -28,9 +28,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int 
 int main(int argc, char* argv[])
 #endif
 {
-	if (__argc != 3)
+	if (__argc != 5)
 	{
-		printf("Usage: %s <remote_ip> <remote_port>\n", __argv[0]);
+		printf("Usage: %s <remote_ip> <remote_port> <target_ip> <target_port>\n", __argv[0]);
 		return 0;
 	}
 
@@ -42,6 +42,16 @@ int main(int argc, char* argv[])
 			__argv[2]);
 		exit(-1);
 	}
+
+	char* targetIP = __argv[3];
+	int targetPort = atoi(__argv[4]);
+	if ((targetPort < 0) || (targetPort > 65535))
+	{
+		fprintf(stderr, "Invalid port value \"%s\" must be in range 0..65535\n",
+			__argv[4]);
+		exit(-1);
+	}
+
 #ifdef _WIN32
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
@@ -75,8 +85,8 @@ int main(int argc, char* argv[])
 	struct sockaddr_in sshSockAddr;
 	memset(&sshSockAddr, 0, sizeof(sshSockAddr));
 	sshSockAddr.sin_family = AF_INET;
-	sshSockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sshSockAddr.sin_port = htons((unsigned short)22);
+	sshSockAddr.sin_addr.s_addr = inet_addr(targetIP);
+	sshSockAddr.sin_port = htons((unsigned short)targetPort);
 
 	if (connect(sshSock, (struct sockaddr*)&sshSockAddr,
 		sizeof(sshSockAddr)) != 0)

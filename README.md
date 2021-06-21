@@ -9,6 +9,9 @@ Prerequisite: MinGW or MSYS2 compiler toolchain.
 ```
 git clone https://github.com/dev-frog/C-Reverse-Shell.git
 cd C-Reverse-Shell
+mkdir build
+cd build
+cmake ..
 make
 ```  
 

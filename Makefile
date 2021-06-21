@@ -1,7 +1,10 @@
-build:
-	gcc Server.c -o server
-	i686-w64-mingw32-gcc reverse.c -o malware.exe  -lwsock32 -lwininet
+APP := c-reverse-shell.exe
+
+all: $(APP)
+
+$(APP): reverse.c
+	x86_64-w64-mingw32-gcc $< -o $@ -lwsock32 -lwininet
 
 
 clean:
-	rm server malware.exe
+	rm server $(APP)

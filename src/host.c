@@ -17,41 +17,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-static int remoteSock, sshSock;
-
-static void shell()
-{
-	char input[1024];
-	while (1)
-	{
-		ssize_t szinput = recv(remoteSock, input, sizeof(input), 0);
-		if (szinput == -1) exit(-1);
-
-		while (szinput)
-		{
-			ssize_t sent = send(sshSock, input, szinput, 0);
-			if (sent == -1) exit(-1);
-
-			szinput -= sent;
-
-			char output[1024];
-			while (1)
-			{
-				ssize_t szoutput = recv(sshSock, output, sizeof(output), 0);
-				if (szoutput == -1) exit(-1);
-				if (szoutput == 0) break;
-
-				while (szoutput)
-				{
-					ssize_t received = send(remoteSock, output, szoutput, 0);
-					if (received == -1) exit(-1);
-
-					szoutput -= received;
-				}
-			}
-		}
-	}
-}
+#include "mainloop.h"
 
 #ifdef _WIN32
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmdLine, int nCmdShow)
@@ -84,12 +50,14 @@ int main(int argc, char* argv[])
 		exit(-1);
 	}
 #endif
-	remoteSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	int remoteSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	struct sockaddr_in remoteSockAddr;
 	memset(&remoteSockAddr, 0, sizeof(remoteSockAddr));
 	remoteSockAddr.sin_family = AF_INET;
 	remoteSockAddr.sin_addr.s_addr = inet_addr(remoteIP);
 	remoteSockAddr.sin_port = htons((unsigned short)remotePort);
+
+	printf("Waiting for connection...\n");
 
 	while (1)
 	{
@@ -100,7 +68,10 @@ int main(int argc, char* argv[])
 		Sleep(1);
 	}
 
-	sshSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	printf("Connected to remote %s:%d\n", inet_ntoa(remoteSockAddr.sin_addr),
+		ntohs(remoteSockAddr.sin_port)); 
+
+	int sshSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	struct sockaddr_in sshSockAddr;
 	memset(&sshSockAddr, 0, sizeof(sshSockAddr));
 	sshSockAddr.sin_family = AF_INET;
@@ -111,7 +82,10 @@ int main(int argc, char* argv[])
 		sizeof(sshSockAddr)) != 0)
 		exit(-1);
 
-	shell();
+	printf("Connected to SSH server %s:%d\n", inet_ntoa(sshSockAddr.sin_addr),
+		ntohs(sshSockAddr.sin_port));
+
+	mainloop(remoteSock, sshSock);
 
 #ifdef _WIN32
 	closesocket(remoteSock);

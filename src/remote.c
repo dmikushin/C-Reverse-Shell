@@ -7,62 +7,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-static int hostSockAccepted, sshSockAccepted;
-
-static void shell()
-{
-        char input[1024];
-        while (1)
-        {
-                ssize_t szinput = recv(sshSockAccepted, input, sizeof(input), 0);
-                if (szinput == -1)
-		{
-			fprintf(stderr, "Error in recv(sshSockAccepted) at %s:%d\n", __FILE__, __LINE__);
-			exit(-1);
-		}
-
-		printf("Transferring %zu bytes from SSH client to host\n", (size_t)szinput);
-
-                while (szinput)
-                {
-                        ssize_t sent = send(hostSockAccepted, input, szinput, 0);
-                        if (sent == -1)
-			{
-				fprintf(stderr, "Error in send(hostSockAccepted) at %s:%d\n", __FILE__, __LINE__);
-				exit(-1);
-			}
-
-                        szinput -= sent;
-
-                        char output[1024];
-                        while (1)
-                        {
-                                ssize_t szoutput = recv(hostSockAccepted, output, sizeof(output), 0);
-                                if (szoutput == -1)
-				{
-					fprintf(stderr, "Error in recv(hostSockAccepted) at %s:%d\n", __FILE__, __LINE__);
-					exit(-1);
-				}
-
-                                if (szoutput == 0) break;
-
-				printf("Transferring %zu bytes from host to SSH client\n", (size_t)szoutput);
-
-                                while (szoutput)
-                                {
-                                        ssize_t received = send(sshSockAccepted, output, szoutput, 0);
-                                        if (received == -1)
-					{
-						fprintf(stderr, "Error in send(sshSockAccepted) at %s:%d\n", __FILE__, __LINE__);
-						exit(-1);
-					}
-
-                                        szoutput -= received;
-                                }
-                        }
-                }
-        }
-}
+#include "mainloop.h"
 
 int main(int argc, char const *argv[])
 {
@@ -80,21 +25,22 @@ int main(int argc, char const *argv[])
 		exit(-1);
 	}
 
-	struct sockaddr_in hostSockAddress;
-	hostSockAddress.sin_family = AF_INET;
-	hostSockAddress.sin_addr.s_addr = inet_addr("0.0.0.0");
-	hostSockAddress.sin_port = htons(atoi(argv[1]));
-	bind(hostSock, (struct sockaddr *)&hostSockAddress, sizeof(hostSockAddress));
+	struct sockaddr_in hostSockAddr;
+	hostSockAddr.sin_family = AF_INET;
+	hostSockAddr.sin_addr.s_addr = inet_addr("0.0.0.0");
+	hostSockAddr.sin_port = htons(atoi(argv[1]));
+	bind(hostSock, (struct sockaddr *)&hostSockAddr, sizeof(hostSockAddr));
 	listen(hostSock, 1);
-	socklen_t hostSockAddressLength = sizeof(hostSockAddress);
-	hostSockAccepted = accept(hostSock, (struct sockaddr *)&hostSockAddress, &hostSockAddressLength);
+	socklen_t hostSockAddrLength = sizeof(hostSockAddr);
+	int hostSockAccepted = accept(hostSock, (struct sockaddr *)&hostSockAddr, &hostSockAddrLength);
 	if (hostSockAccepted == -1)
 	{
 		fprintf(stderr, "Error accepting host connection\n");
 		exit(-1);
 	}
 
-	printf("Connected to host %s:%d\n", "a", 1);
+	printf("Connected to host %s:%d\n", inet_ntoa(hostSockAddr.sin_addr),
+		ntohs(hostSockAddr.sin_port));
 
         int sshSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (setsockopt(sshSock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
@@ -103,23 +49,24 @@ int main(int argc, char const *argv[])
                 exit(-1);
         }
 
-        struct sockaddr_in sshSockAddress;
-        sshSockAddress.sin_family = AF_INET;
-        sshSockAddress.sin_addr.s_addr = inet_addr("0.0.0.0");
-        sshSockAddress.sin_port = htons(atoi(argv[1]) + 1);
-        bind(sshSock, (struct sockaddr *)&sshSockAddress, sizeof(sshSockAddress));
+        struct sockaddr_in sshSockAddr;
+        sshSockAddr.sin_family = AF_INET;
+        sshSockAddr.sin_addr.s_addr = inet_addr("0.0.0.0");
+        sshSockAddr.sin_port = htons(atoi(argv[1]) + 1);
+        bind(sshSock, (struct sockaddr *)&sshSockAddr, sizeof(sshSockAddr));
         listen(sshSock, 1);
-        socklen_t sshSockAddressLength = sizeof(sshSockAddress);
-        sshSockAccepted = accept(sshSock, (struct sockaddr *)&sshSockAddress, &sshSockAddressLength);
+        socklen_t sshSockAddrLength = sizeof(sshSockAddr);
+        int sshSockAccepted = accept(sshSock, (struct sockaddr *)&sshSockAddr, &sshSockAddrLength);
         if (sshSockAccepted == -1)
         {
                 fprintf(stderr, "Error accepting host connection\n");
                 exit(-1);
         }
 
-        printf("Connected to SSH client %s:%d\n", "a", 1);
+        printf("Connected to SSH client %s:%d\n", inet_ntoa(sshSockAddr.sin_addr),
+		ntohs(sshSockAddr.sin_port));
 
-        shell();
+        mainloop(sshSockAccepted, hostSockAccepted);
 
 #ifdef _WIN32
         closesocket(hostSock); closesocket(hostSockAccepted);
